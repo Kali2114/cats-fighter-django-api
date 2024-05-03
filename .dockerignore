@@ -1,0 +1,13 @@
+# Git
+.git
+.gitignore
+
+# Docker
+.docker
+
+# Python
+cap-api/__pychache__
+cap-api/*/__pychache__
+.env/
+.venv/
+venv/
