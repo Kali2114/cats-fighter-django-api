@@ -11,6 +11,12 @@ class CatSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Cat
-        fields = ['id', 'name', 'description',
-                  'weight', 'color', 'dangerous']
+        fields = ['id', 'name', 'dangerous']
         read_only_fields = ['id']
+
+
+class CatDetailSerializer(CatSerializer):
+    """Serializer for cat detail."""
+
+    class Meta(CatSerializer.Meta):
+        fields = CatSerializer.Meta.fields + ['description', 'weight', 'color']
