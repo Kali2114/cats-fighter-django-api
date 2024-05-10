@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 API_VENV/
+.idea/
 
 # C extensions
 *.so

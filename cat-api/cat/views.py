@@ -1,11 +1,11 @@
 """
 Views for cat APIs.
 """
-from rest_framework import viewsets
+from rest_framework import viewsets, mixins
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 
-from core.models import Cat
+from core.models import Ability, Cat
 from cat import serializers
 
 
@@ -29,3 +29,7 @@ class CatViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Create a new cat object."""
         serializer.save(user=self.request.user)
+
+
+class AbilityViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    serializer_class = serializers.AbilitySerializer
