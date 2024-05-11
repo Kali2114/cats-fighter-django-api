@@ -1,2 +1,2 @@
 # cats-fighter-django-api
-Cats Fighter Django + Api Project
+Cats Fighters Django Api Project
