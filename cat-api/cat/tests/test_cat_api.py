@@ -1,7 +1,7 @@
 """
 Tests for cat API.
 """
-
+from django.forms.models import model_to_dict
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -9,9 +9,17 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Cat
+from core.models import (
+    Cat,
+    Ability,
+    FightingStyles,
+)
 
-from cat.serializers import CatSerializer, CatDetailSerializer
+from cat.serializers import (
+    CatSerializer,
+    CatDetailSerializer,
+    FightingStylesSerializer,
+)
 
 
 CAT_URL = reverse('cat:cat-list')
@@ -191,3 +199,176 @@ class PrivateCatApiTests(TestCase):
         self.assertEqual(cat.user, another_user)
         self.assertTrue(Cat.objects.filter(id=cat.id).exists())
 
+    def test_create_cat_with_new_ability(self):
+        """Test creating a cat with new ability."""
+        data = {
+            'name': 'Char Cat',
+            'description': 'Fast and Furious',
+            'weight': 7,
+            'color': 'Blue',
+            'dangerous': False,
+            'abilities': [{'name': 'Lighting Style'}, {'name': 'Teleportation'}]
+        }
+        res = self.client.post(CAT_URL, data, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        cats = Cat.objects.filter(user=self.user)
+        self.assertEqual(cats.count(), 1)
+        cat = cats[0]
+        self.assertEqual(cat.abilities.count(), 2)
+        for ability in data['abilities']:
+            exists = cat.abilities.filter(
+                user=self.user,
+                name=ability['name'],
+            ).exists()
+            self.assertTrue(exists)
+
+    def test_creating_cat_with_existing_abilities(self):
+        """Test creating a cat with existing ability."""
+        ability_stone_body = Ability.objects.create(user=self.user, name='Stone Body')
+        data = {
+            'name': 'Dark Cat',
+            'description': 'Mysterious cat...',
+            'weight': 9,
+            'color': 'Dark',
+            'dangerous': True,
+            'abilities': [{'name': 'Quick Attacks'}, {'name': 'Stone Body'}]
+        }
+        res = self.client.post(CAT_URL, data, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        cats = Cat.objects.filter(user=self.user)
+        self.assertEqual(cats.count(), 1)
+        cat = cats[0]
+        self.assertEqual(cat.abilities.count(), 2)
+        self.assertIn(ability_stone_body, cat.abilities.all())
+        for ability in data['abilities']:
+            exists = cat.abilities.filter(
+                user=self.user,
+                name=ability['name']
+            )
+            self.assertTrue(exists)
+
+    def test_create_ability_on_update(self):
+        """Test creating ability when updating a cat."""
+        cat = create_cat(user=self.user)
+
+        data = {'abilities': [{'name': 'Earthquake'}]}
+        url = detail_url(cat.id)
+        res = self.client.patch(url, data, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        new_ability = Ability.objects.get(user=self.user, name='Earthquake')
+        self.assertIn(new_ability, cat.abilities.all())
+
+    def test_update_ability_assign_in(self):
+        """Test assigning an existing ability when updating a cat."""
+        ability_fire_punch = Ability.objects.create(user=self.user, name='Fire Punch')
+        cat = create_cat(user=self.user)
+        cat.abilities.add(ability_fire_punch)
+
+        ability_ice_shield = Ability.objects.create(user=self.user, name='Ice Shield')
+        data = {'abilities': [{'name': 'Ice Shield'}]}
+        url = detail_url(cat.id)
+        res = self.client.patch(url, data, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn(ability_ice_shield, cat.abilities.all())
+        self.assertNotIn(ability_fire_punch, cat.abilities.all())
+
+    def test_clear_cat_abilities(self):
+        """Test clearing cat abilities."""
+        ability = Ability.objects.create(user=self.user, name='Wood Style')
+        cat = create_cat(user=self.user)
+        cat.abilities.add(ability)
+
+        data = {'abilities': []}
+        url = detail_url(cat.id)
+        res = self.client.patch(url, data, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(cat.abilities.count(), 0)
+
+    def test_create_cat_with_new_fighting_style(self):
+        """Test creating a cat with new fighting style."""
+        data = {
+            'name': 'Blody Cat',
+            'description': 'He will get you in five seconds!',
+            'weight': 5.5,
+            'color': 'Blue',
+            'dangerous': True,
+            'fighting_styles': [{'name': 'KB', 'ground_allowed': False},
+                                {'name': 'MT', 'ground_allowed': False},
+                                ]
+        }
+        res = self.client.post(CAT_URL, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        cats = Cat.objects.all()
+        self.assertEqual(cats.count(), 1)
+        cat = cats[0]
+        self.assertEqual(cat.fighting_styles.count(), 2)
+        for styles in data['fighting_styles']:
+            exists = cat.fighting_styles.filter(
+                name=styles['name'],
+                ground_allowed=styles['ground_allowed']
+            ).exists()
+            self.assertTrue(exists)
+
+    def test_create_cat_with_existing_fight_style(self):
+        """Test creating a cat with existing fight style."""
+        style = FightingStyles.objects.create(name='BJJ', ground_allowed=True)
+        style_dict = model_to_dict(style, fields=['name', 'ground_allowed'])
+        data = {
+            'name': 'Bloody Cat',
+            'description': 'He will get you in five seconds!',
+            'weight': 5.5,
+            'color': 'Blue',
+            'dangerous': True,
+            'fighting_styles': [style_dict]
+        }
+        res = self.client.post(CAT_URL, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Cat.objects.count(), 1)
+        cat = Cat.objects.get()
+        self.assertIn(style, cat.fighting_styles.all())
+
+    def test_create_fighting_style_on_update(self):
+        """Test creating a fighting style when updating a cat."""
+        cat = create_cat(user=self.user)
+
+        data = {'fighting_styles': [{'name': 'BJJ', 'ground_allowed': True}]}
+        url = detail_url(cat.id)
+        res = self.client.patch(url, data, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(cat.fighting_styles.count(), 1)
+        new_style = FightingStyles.objects.get(name='BJJ')
+        self.assertIn(new_style, cat.fighting_styles.all())
+
+    def test_update_cat_assign_fighting_style(self):
+        """Test assigning an existing fighting style when update a cat."""
+        style1 = FightingStyles.objects.create(name='BX', ground_allowed=False)
+        cat = create_cat(user=self.user)
+        cat.fighting_styles.add(style1)
+
+        style2 = FightingStyles.objects.create(name='WR', ground_allowed=True)
+        data = {'fighting_styles': [{'name': 'WR', 'ground_allowed': True}]}
+        url = detail_url(cat.id)
+        res = self.client.patch(url, data, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn(style2, cat.fighting_styles.all())
+        self.assertNotIn(style1, cat.fighting_styles.all())
+
+    def test_clear_cat_fighting_styles(self):
+        fighting_style = FightingStyles.objects.create(name='MT', ground_allowed=False)
+        cat = create_cat(user=self.user)
+        cat.fighting_styles.add(fighting_style)
+
+        data = {'fighting_styles': []}
+        url = detail_url(cat.id)
+        res = self.client.patch(url, data, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(cat.fighting_styles.count(), 0)
+        self.assertFalse(cat.fighting_styles.filter(id=fighting_style.id).exists())

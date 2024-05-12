@@ -13,6 +13,8 @@ from cat import views
 
 router = DefaultRouter()
 router.register('cats', views.CatViewSet)
+router.register('abilities', views.AbilityViewSet)
+router.register('fighting_styles', views.FightingStylesViewSet)
 
 app_name = 'cat'
 
