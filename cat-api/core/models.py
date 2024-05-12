@@ -1,6 +1,8 @@
 """
 Database models.
 """
+from django.core.exceptions import ValidationError
+
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import (
@@ -56,6 +58,7 @@ class Cat(models.Model):
     color = models.CharField(max_length=50, blank=True)
     dangerous = models.BooleanField(default=True)
     abilities = models.ManyToManyField('Ability')
+    fighting_styles = models.ManyToManyField('FightingStyles')
 
     def __str__(self):
         return self.name
@@ -68,6 +71,27 @@ class Ability(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
     )
+
+    def __str__(self):
+        return self.name
+
+class FightingStyles(models.Model):
+    """Fighting styles for cat objects."""
+    CHOICES = (
+        ('BX', 'Box'),
+        ('KB', 'Kickboxing'),
+        ('MT', 'Muay Thai'),
+        ('WR', 'Wrestling'),
+        ('BJJ', 'Brazilian Jiu-Jitsu')
+    )
+
+    name = models.CharField(max_length=50, choices=CHOICES)
+    ground_allowed = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not any(self.name == choice[0] for choice in self.CHOICES):
+            raise ValidationError(f'{self.name} is not a valid choice.')
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name

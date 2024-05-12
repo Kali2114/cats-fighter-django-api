@@ -45,3 +45,4 @@ class UserAdmin(BaseUserAdmin):
 admin.site.register(models.User, UserAdmin)
 admin.site.register(models.Cat)
 admin.site.register(models.Ability)
+admin.site.register(models.FightingStyles)

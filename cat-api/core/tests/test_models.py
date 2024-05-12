@@ -3,6 +3,7 @@ Tests for models.
 """
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 from .. import models
 
@@ -78,3 +79,19 @@ class ModelTest(TestCase):
             name='Invisible'
         )
         self.assertEqual(str(ability), ability.name)
+
+    def test_create_fight_style_successful(self):
+        """Test creating fighting style successful with valid name."""
+        fighting_style = models.FightingStyles.objects.create(
+            name='KB',
+            ground_allowed=False,
+        )
+        self.assertEqual(str(fighting_style), fighting_style.name)
+
+    def test_create_fight_style_unsuccessful(self):
+        """Test creating fighting style unsuccessful with an invalid name."""
+        with self.assertRaises(ValidationError):
+            models.FightingStyles.objects.create(
+                name='invalide name',
+                ground_allowed=True,
+            )

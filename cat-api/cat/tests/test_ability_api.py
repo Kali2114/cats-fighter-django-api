@@ -16,6 +16,10 @@ from cat.serializers import AbilitySerializer
 ABILITIES_URL = reverse('cat:ability-list')
 
 
+def detail_url(ability_id):
+    """Create and return a tag detail url."""
+    return reverse('cat:ability-detail', args=[ability_id])
+
 def create_user(email='test@example.com', password='test123'):
     """Create and return the user."""
     return get_user_model().objects.create_user(email=email, password=password)
@@ -39,7 +43,7 @@ class PrivateAbilitiesApiTests(TestCase):
 
     def setUp(self):
         self.user = create_user()
-        self.client = APIClient
+        self.client = APIClient()
         self.client.force_authenticate(self.user)
 
     def test_retrieve_abilities(self):
@@ -65,3 +69,24 @@ class PrivateAbilitiesApiTests(TestCase):
         self.assertEqual(len(res.data), 1)
         self.assertEqual(res.data[0]['name'], ability.name)
         self.assertEqual(res.data[0]['id'], ability.id)
+
+    def test_update_ability(self):
+        """Test updating a ability."""
+        ability = Ability.objects.create(user=self.user, name='Fireballs')
+
+        data = {'name': 'Water Shield'}
+        url = detail_url(ability.id)
+        res = self.client.patch(url, data)
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        ability.refresh_from_db()
+        self.assertEqual(ability.name, data['name'])
+
+    def test_delete_ability(self):
+        """Test deleting ability successful."""
+        ability = Ability.objects.create(user=self.user, name='High Jumping')
+        url = detail_url(ability.id)
+        res = self.client.delete(url)
+
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Ability.objects.filter(user=self.user).exists())
