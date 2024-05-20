@@ -84,3 +84,12 @@ class CatDetailSerializer(CatSerializer):
 
     class Meta(CatSerializer.Meta):
         fields = CatSerializer.Meta.fields + ['description', 'weight', 'color']
+
+class CatImageSerializer(serializers.ModelSerializer):
+    """Serializer for uploading images to cats."""
+
+    class Meta:
+        model = Cat
+        fields = ['id', 'image']
+        read_only_fields = ['id']
+        extra_kwargs = {'image': {'required': True}}

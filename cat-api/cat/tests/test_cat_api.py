@@ -1,6 +1,11 @@
 """
 Tests for cat API.
 """
+import tempfile
+import os
+
+from PIL import Image
+
 from django.forms.models import model_to_dict
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -28,6 +33,10 @@ CAT_URL = reverse('cat:cat-list')
 def detail_url(cat_id):
     """Create and return a cat detail url."""
     return reverse('cat:cat-detail', args=[cat_id])
+
+def image_upload_url(cat_id):
+    """Create and return an image upload url."""
+    return reverse('cat:cat-upload-image', args=[cat_id])
 
 def create_cat(user, **args):
     """Create and return simple cat object."""
@@ -372,3 +381,81 @@ class PrivateCatApiTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(cat.fighting_styles.count(), 0)
         self.assertFalse(cat.fighting_styles.filter(id=fighting_style.id).exists())
+
+    def test_filter_by_abilities(self):
+        """Test filtering cats by abilities."""
+        c1 = create_cat(user=self.user, name='Big Brown')
+        c2 = create_cat(user=self.user, name='Slim Shady')
+        a1 = Ability.objects.create(user=self.user, name='Fireball')
+        a2 = Ability.objects.create(user=self.user, name='Hypnosis')
+        c1.abilities.add(a1)
+        c2.abilities.add(a2)
+        c3 = create_cat(user=self.user, name='Bouncing')
+
+        params = {'abilities': f'{a1.id}, {a2.id}'}
+        res = self.client.get(CAT_URL, params)
+
+        s1 = CatSerializer(c1)
+        s2 = CatSerializer(c2)
+        s3 = CatSerializer(c3)
+        self.assertIn(s1.data, res.data)
+        self.assertIn(s2.data, res.data)
+        self.assertNotIn(s3.data, res.data)
+
+    def filter_by_fighting_styles(self):
+        """Test filtering cats by fighting styles"""
+        c1 = create_cat(user=self.user, name='Big Brown')
+        c2 = create_cat(user=self.user, name='Slim Shady')
+        fs1 = FightingStyles.objects.create(name='BX', ground_allowed=False)
+        fs2 = FightingStyles.objects.create(name='WR', ground_allowed=True)
+        c1.fighting_styles.add(fs1)
+        c2.fighting_styles.add(fs2)
+        c3 = create_cat(user=self.user, name='Bouncing')
+
+        params = {'fighting_styles': f'{fs1.id}, {fs2.id}'}
+        res = self.client.get(CAT_URL, params)
+
+        s1 = CatSerializer(c1)
+        s2 = CatSerializer(c2)
+        s3 = CatSerializer(c3)
+        self.assertIn(s1.data, res.data)
+        self.assertIn(s2.data, res.data)
+        self.assertNotIn(s3.data, res.data)
+
+class ImageUploadTests(TestCase):
+    """Tests for the image upload API."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = get_user_model().objects.create_user(
+            'user@example.com',
+            'password123',
+        )
+        self.client.force_authenticate(self.user)
+        self.cat = create_cat(user=self.user)
+
+    def tearDown(self):
+        self.cat.image.delete()
+
+    def test_upload_image(self):
+        """Test uploading an image to a cat."""
+        url = image_upload_url(self.cat.id)
+        with tempfile.NamedTemporaryFile(suffix='.jpg') as image_file:
+            img = Image.new('RGB', (10, 10))
+            img.save(image_file, format='JPEG')
+            image_file.seek(0)
+            data = {'image': image_file}
+            res = self.client.post(url, data, format='multipart')
+
+        self.cat.refresh_from_db()
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn('image', res.data)
+        self.assertTrue(os.path.exists(self.cat.image.path))
+
+    def test_upload_image_bad_request(self):
+        """Test uploading invalid image."""
+        url = image_upload_url(self.cat.id)
+        data = {'image': 'no_file'}
+        res = self.client.post(url, data, format='multipart')
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
