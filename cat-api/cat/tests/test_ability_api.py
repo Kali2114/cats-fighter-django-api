@@ -8,7 +8,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Ability
+from core.models import Ability, Cat
 
 from cat.serializers import AbilitySerializer
 
@@ -90,3 +90,51 @@ class PrivateAbilitiesApiTests(TestCase):
 
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Ability.objects.filter(user=self.user).exists())
+
+    def test_filter_abilities_assigned_to_cats(self):
+        """Test listing abilities by those assigned to cats."""
+        a1 = Ability.objects.create(user=self.user, name='Teleportation')
+        a2 = Ability.objects.create(user=self.user, name='Illusion')
+        cat = Cat.objects.create(
+            user=self.user,
+            name='Wolverine',
+            description='Fast and furious.',
+            weight=3.5,
+            color='Black',
+            dangerous=True,
+        )
+        cat.abilities.add(a1)
+
+        res = self.client.get(ABILITIES_URL, {'assigned_only': 1})
+
+        s1 = AbilitySerializer(a1)
+        s2 = AbilitySerializer(a2)
+        self.assertIn(s1.data, res.data)
+        self.assertNotIn(s2.data, res.data)
+
+    def test_filtered_abilities_unique(self):
+        """Test filtered abilities return a unique list."""
+        a = Ability.objects.create(user=self.user, name='Fireball')
+        Ability.objects.create(user=self.user, name='Water Clones')
+        cat1 = Cat.objects.create(
+            user=self.user,
+            name='Wolverine',
+            description='Fast and furious.',
+            weight=3.5,
+            color='Black',
+            dangerous=True,
+        )
+        cat2 = Cat.objects.create(
+            user=self.user,
+            name='Shinki',
+            description='Gods Powers.',
+            weight=3.5,
+            color='Black',
+            dangerous=True,
+        )
+        cat1.abilities.add(a)
+        cat2.abilities.add(a)
+
+        res = self.client.get(ABILITIES_URL, {'assigned_only': 1})
+
+        self.assertEqual(len(res.data), 1)
